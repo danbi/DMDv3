@@ -166,6 +166,10 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn, CWallet* pwallet, 
         CBlockIndex* pindexPrev = chainActive.Tip();
         const int nHeight = pindexPrev->nHeight + 1;
         CCoinsViewCache view(pcoinsTip);
+		
+		/*pblock->vtx.push_back(txNew);
+		pblocktemplate->vTxFees.push_back(-1);   // updated at end
+		pblocktemplate->vTxSigOps.push_back(-1);*/
 
         // Priority order to process transactions
         list<COrphan> vOrphan; // list memory doesn't move
@@ -360,6 +364,7 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn, CWallet* pwallet, 
         pblock->nBits = GetNextWorkRequired(pindexPrev, pblock);
         pblock->nNonce = 0;
         pblocktemplate->vTxSigOps[0] = GetLegacySigOpCount(pblock->vtx[0]);
+		//LogPrintf("BlockValue : %d", pblock->nValue);
 
         CValidationState state;
         if (!TestBlockValidity(state, *pblock, pindexPrev, false, false)) {
@@ -524,6 +529,7 @@ void BitcoinMiner(CWallet* pwallet, bool fProofOfStake)
         //
         int64_t nStart = GetTime();
         uint256 hashTarget = uint256().SetCompact(pblock->nBits);
+		LogPrintf("HashTarget is : %s\n", hashTarget.GetHex());
         while (true) {
             unsigned int nHashesDone = 0;
 
