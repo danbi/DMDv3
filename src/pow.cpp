@@ -123,9 +123,12 @@ bool CheckProofOfWork(uint256 hash, unsigned int nBits)
         return error("CheckProofOfWork() : nBits below minimum work");
 
     // Check proof of work matches claimed amount
-    if (hash > bnTarget)
+    if ((hash > bnTarget) && hash != Params().HashGenesisBlock())
+	{
+		LogPrintf("CheckProofOfWork() : hash is %s  \ntarget: %s\nBits is %d", hash.GetHex(), bnTarget.GetHex(), nBits);
         return error("CheckProofOfWork() : hash doesn't match nBits");
-
+	}
+	
     return true;
 }
 
