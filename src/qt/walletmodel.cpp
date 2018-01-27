@@ -37,6 +37,7 @@ WalletModel::WalletModel(CWallet* wallet, OptionsModel* optionsModel, QObject* p
                                                                                          cachedNumBlocks(0)
 {
     fHaveWatchOnly = wallet->HaveWatchOnly();
+    fHaveMultiSig = wallet->HaveMultiSig();
     fForceCheckBalanceChanged = false;
 
     addressTableModel = new AddressTableModel(wallet, this);
@@ -192,6 +193,12 @@ void WalletModel::updateWatchOnlyFlag(bool fHaveWatchonly)
 {
     fHaveWatchOnly = fHaveWatchonly;
     emit notifyWatchonlyChanged(fHaveWatchonly);
+}
+
+void WalletModel::updateMultiSigFlag(bool fHaveMultiSig)
+{
+    this->fHaveMultiSig = fHaveMultiSig;
+    emit notifyMultiSigChanged(fHaveMultiSig);
 }
 
 bool WalletModel::validateAddress(const QString& address)
@@ -394,13 +401,14 @@ WalletModel::EncryptionStatus WalletModel::getEncryptionStatus() const
 {
     if (!wallet->IsCrypted()) {
         return Unencrypted;
-    } else if (wallet->IsLocked()) {
-        return Locked;
     } else if (wallet->fWalletUnlockAnonymizeOnly) {
         return UnlockedForAnonymizationOnly;
+    } else if (wallet->IsLocked()) {
+        return Locked;
     } else {
         return Unlocked;
     }
+
 }
 
 bool WalletModel::setWalletEncrypted(bool encrypted, const SecureString& passphrase)
@@ -500,6 +508,12 @@ static void NotifyWatchonlyChanged(WalletModel* walletmodel, bool fHaveWatchonly
         Q_ARG(bool, fHaveWatchonly));
 }
 
+static void NotifyMultiSigChanged(WalletModel* walletmodel, bool fHaveMultiSig)
+{
+    QMetaObject::invokeMethod(walletmodel, "updateMultiSigFlag", Qt::QueuedConnection,
+                              Q_ARG(bool, fHaveMultiSig));
+}
+
 void WalletModel::subscribeToCoreSignals()
 {
     // Connect signals to wallet
@@ -508,6 +522,7 @@ void WalletModel::subscribeToCoreSignals()
     wallet->NotifyTransactionChanged.connect(boost::bind(NotifyTransactionChanged, this, _1, _2, _3));
     wallet->ShowProgress.connect(boost::bind(ShowProgress, this, _1, _2));
     wallet->NotifyWatchonlyChanged.connect(boost::bind(NotifyWatchonlyChanged, this, _1));
+	wallet->NotifyMultiSigChanged.connect(boost::bind(NotifyMultiSigChanged, this, _1));
 }
 
 void WalletModel::unsubscribeFromCoreSignals()
@@ -518,6 +533,7 @@ void WalletModel::unsubscribeFromCoreSignals()
     wallet->NotifyTransactionChanged.disconnect(boost::bind(NotifyTransactionChanged, this, _1, _2, _3));
     wallet->ShowProgress.disconnect(boost::bind(ShowProgress, this, _1, _2));
     wallet->NotifyWatchonlyChanged.disconnect(boost::bind(NotifyWatchonlyChanged, this, _1));
+	wallet->NotifyMultiSigChanged.disconnect(boost::bind(NotifyMultiSigChanged, this, _1));
 }
 
 // WalletModel::UnlockContext implementation
@@ -527,6 +543,7 @@ WalletModel::UnlockContext WalletModel::requestUnlock(bool relock)
 
     if (!was_locked && isAnonymizeOnlyUnlocked()) {
         setWalletLocked(true);
+        wallet->fWalletUnlockAnonymizeOnly = false;
         was_locked = getEncryptionStatus() == Locked;
     }
 
@@ -549,9 +566,11 @@ WalletModel::UnlockContext::UnlockContext(WalletModel* wallet, bool valid, bool 
 
 WalletModel::UnlockContext::~UnlockContext()
 {
+/*
     if (valid && relock) {
         wallet->setWalletLocked(true);
     }
+*/
 }
 
 void WalletModel::UnlockContext::CopyFrom(const UnlockContext& rhs)
