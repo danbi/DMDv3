@@ -1,7 +1,8 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2014 The Bitcoin developers
 // Copyright (c) 2014-2015 The Dash developers
-// Copyright (c) 2015-2017 The DMD developers
+// Copyright (c) 2015-2017 The PIVX developers 
+// Copyright (c) 2015-2017 The DMD Diamond developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -348,6 +349,7 @@ std::string HelpMessage(HelpMessageMode mode)
     strUsage += HelpMessageOpt("-port=<port>", strprintf(_("Listen for connections on <port> (default: %u or testnet: %u)"), 17771, 51474));
     strUsage += HelpMessageOpt("-proxy=<ip:port>", _("Connect through SOCKS5 proxy"));
     strUsage += HelpMessageOpt("-seednode=<ip>", _("Connect to a node to retrieve peer addresses, and disconnect"));
+	strUsage += HelpMessageOpt("--changeaddress=<DMD Address>", _("Add your DMD changeaddress"));
     strUsage += HelpMessageOpt("-timeout=<n>", strprintf(_("Specify connection timeout in milliseconds (minimum: 1, default: %d)"), DEFAULT_CONNECT_TIMEOUT));
 #ifdef USE_UPNP
 #if USE_UPNP
@@ -466,8 +468,8 @@ std::string HelpMessage(HelpMessageMode mode)
     strUsage += HelpMessageOpt("-mixTXrounds=<n>", strprintf(_("Use N separate masternodes to anonymize funds  (2-8, default: %u)"), 2));
     strUsage += HelpMessageOpt("-anonymizediamondamount=<n>", strprintf(_("Keep N DMD anonymized (default: %u)"), 0));
     strUsage += HelpMessageOpt("-liquidityprovider=<n>", strprintf(_("Provide liquidity to mixTX by infrequently mixing coins on a continual basis (0-100, default: %u, 1=very frequent, high fees, 100=very infrequent, low fees)"), 0));
-
-    strUsage += HelpMessageGroup(_("quickTX options:"));
+	
+	strUsage += HelpMessageGroup(_("quickTX options:"));
     strUsage += HelpMessageOpt("-enablequicktx=<n>", strprintf(_("Enable quicktx, show confirmations for locked transactions (bool, default: %s)"), "true"));
     strUsage += HelpMessageOpt("-quicktxdepth=<n>", strprintf(_("Show N confirmations for a successfully locked transaction (0-9999, default: %u)"), nquickTXDepth));
 
@@ -489,7 +491,7 @@ std::string HelpMessage(HelpMessageMode mode)
     strUsage += HelpMessageOpt("-rpcbind=<addr>", _("Bind to given address to listen for JSON-RPC connections. Use [host]:port notation for IPv6. This option can be specified multiple times (default: bind to all interfaces)"));
     strUsage += HelpMessageOpt("-rpcuser=<user>", _("Username for JSON-RPC connections"));
     strUsage += HelpMessageOpt("-rpcpassword=<pw>", _("Password for JSON-RPC connections"));
-    strUsage += HelpMessageOpt("-rpcport=<port>", strprintf(_("Listen for JSON-RPC connections on <port> (default: %u or testnet: %u)"), 51473, 17772));
+    strUsage += HelpMessageOpt("-rpcport=<port>", strprintf(_("Listen for JSON-RPC connections on <port> (default: %u or testnet: %u)"), 17770, 17772));
     strUsage += HelpMessageOpt("-rpcallowip=<ip>", _("Allow JSON-RPC connections from specified source. Valid for <ip> are a single IP (e.g. 1.2.3.4), a network/netmask (e.g. 1.2.3.4/255.255.255.0) or a network/CIDR (e.g. 1.2.3.4/24). This option can be specified multiple times"));
     strUsage += HelpMessageOpt("-rpcthreads=<n>", strprintf(_("Set the number of threads to service RPC calls (default: %d)"), 4));
     strUsage += HelpMessageOpt("-rpckeepalive", strprintf(_("RPC support for HTTP persistent connections (default: %d)"), 1));
@@ -692,6 +694,14 @@ bool AppInit2(boost::thread_group& threadGroup)
     fLogTimestamps = GetBoolArg("-logtimestamps", true);
     fLogIPs = GetBoolArg("-logips", false);
 
+    if (mapArgs.count("-changeaddress"))
+    {
+     CBitcoinAddress address(GetArg("-changeaddress", ""));
+     if (!address.IsValid())
+     throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid Diamond address");
+     changeAddress = address.Get();
+    }
+	
     if (mapArgs.count("-bind") || mapArgs.count("-whitebind")) {
         // when specifying an explicit binding address, you want to listen on it
         // even when -connect or -proxy is specified
@@ -880,7 +890,7 @@ bool AppInit2(boost::thread_group& threadGroup)
     fAlerts = GetBoolArg("-alerts", DEFAULT_ALERTS);
 
 
-    if (GetBoolArg("-peerbloomfilters", false))
+    if (GetBoolArg("-peerbloomfilters", DEFAULT_PEERBLOOMFILTERS))
         nLocalServices |= NODE_BLOOM;
 
     // ********************************************************* Step 4: application initialization: dir lock, daemonize, pidfile, debug log

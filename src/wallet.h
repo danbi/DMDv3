@@ -1,7 +1,8 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2014 The Bitcoin developers
 // Copyright (c) 2014-2015 The Dash developers
-// Copyright (c) 2015-2017 The DMD developers
+// Copyright (c) 2015-2017 The PIVX developers 
+// Copyright (c) 2015-2017 The DMD Diamond developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -247,7 +248,7 @@ public:
         nHashDrift = 45;
         nStakeSplitThreshold = 200;
         nHashInterval = 22;
-        nStakeSetUpdateTime = 300; // 5 minutes
+        nStakeSetUpdateTime = 60; // changed from 5 minutes to 1 minute to have a new set of hashes at below half average blocktime
 
         //MultiSend
         vMultiSend.clear();
@@ -261,7 +262,7 @@ public:
         //Auto Combine Dust
         fCombineDust = false;
         nAutoCombineThreshold = 0;
-		nAutoCombineThresholdTime = 15; //In minutes
+		nAutoCombineThresholdTime = 15; //In minutes // not used
     }
 
     bool isMultiSendEnabled()
@@ -355,6 +356,12 @@ public:
     bool RemoveWatchOnly(const CScript& dest);
     //! Adds a watch-only address to the store, without saving it to disk (used by LoadWallet)
     bool LoadWatchOnly(const CScript& dest);
+
+    //! Adds a MultiSig address to the store, and saves it to disk.
+    bool AddMultiSig(const CScript& dest);
+    bool RemoveMultiSig(const CScript& dest);
+    //! Adds a MultiSig address to the store, without saving it to disk (used by LoadWallet)
+    bool LoadMultiSig(const CScript& dest);
 
     bool Unlock(const SecureString& strWalletPassphrase, bool anonimizeOnly = false);
     bool ChangeWalletPassphrase(const SecureString& strOldWalletPassphrase, const SecureString& strNewWalletPassphrase);
@@ -569,6 +576,9 @@ public:
 
     /** Watch-only address added */
     boost::signals2::signal<void(bool fHaveWatchOnly)> NotifyWatchonlyChanged;
+
+    /** MultiSig address added */
+    boost::signals2::signal<void(bool fHaveMultiSig)> NotifyMultiSigChanged;
 };
 
 /** A key allocated from the key pool. */

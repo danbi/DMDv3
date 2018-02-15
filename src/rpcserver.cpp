@@ -1,7 +1,8 @@
 // Copyright (c) 2010 Satoshi Nakamoto
 // Copyright (c) 2009-2014 The Bitcoin developers
 // Copyright (c) 2014-2015 The Dash developers
-// Copyright (c) 2015-2017 The DMD developers
+// Copyright (c) 2015-2017 The PIVX developers 
+// Copyright (c) 2015-2017 The DMD Diamond developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -332,6 +333,8 @@ static const CRPCCommand vRPCCommands[] =
 		{"wallet", "getautocombineinfo", &getautocombineinfo, false, false, true},
         {"wallet", "gettransaction", &gettransaction, false, false, true},
         {"wallet", "getunconfirmedbalance", &getunconfirmedbalance, false, false, true},
+		{"wallet", "setchangeaddress", &setchangeaddress, true, false, true},
+		{"wallet", "getchangeaddress", &getchangeaddress, true, false, true},
         {"wallet", "getwalletinfo", &getwalletinfo, false, false, true},
         {"wallet", "importprivkey", &importprivkey, true, false, true},
         {"wallet", "importwallet", &importwallet, true, false, true},
@@ -471,20 +474,20 @@ private:
 void ServiceConnection(AcceptedConnection* conn);
 
 //! Forward declaration required for RPCListen
-template <typename Protocol, typename SocketAcceptorService>
-static void RPCAcceptHandler(boost::shared_ptr<basic_socket_acceptor<Protocol, SocketAcceptorService> > acceptor,
-    ssl::context& context,
-    bool fUseSSL,
-    boost::shared_ptr<AcceptedConnection> conn,
+template <typename Protocol>
+static void RPCAcceptHandler(boost::shared_ptr< basic_socket_acceptor<Protocol> > acceptor,
+                              ssl::context& context,
+                              bool fUseSSL,
+                              boost::shared_ptr< AcceptedConnection > conn,
     const boost::system::error_code& error);
 
 /**
  * Sets up I/O resources to accept and handle a new connection.
  */
-template <typename Protocol, typename SocketAcceptorService>
-static void RPCListen(boost::shared_ptr<basic_socket_acceptor<Protocol, SocketAcceptorService> > acceptor,
-    ssl::context& context,
-    const bool fUseSSL)
+template <typename Protocol>
+static void RPCListen(boost::shared_ptr< basic_socket_acceptor<Protocol> > acceptor,
+                    ssl::context& context,
+                    const bool fUseSSL)
 {
     // Accept connection
     boost::shared_ptr<AcceptedConnectionImpl<Protocol> > conn(new AcceptedConnectionImpl<Protocol>(acceptor->get_io_service(), context, fUseSSL));
@@ -492,7 +495,7 @@ static void RPCListen(boost::shared_ptr<basic_socket_acceptor<Protocol, SocketAc
     acceptor->async_accept(
         conn->sslStream.lowest_layer(),
         conn->peer,
-        boost::bind(&RPCAcceptHandler<Protocol, SocketAcceptorService>,
+        boost::bind(&RPCAcceptHandler<Protocol>,
             acceptor,
             boost::ref(context),
             fUseSSL,
@@ -504,11 +507,11 @@ static void RPCListen(boost::shared_ptr<basic_socket_acceptor<Protocol, SocketAc
 /**
  * Accept and handle incoming connection.
  */
-template <typename Protocol, typename SocketAcceptorService>
-static void RPCAcceptHandler(boost::shared_ptr<basic_socket_acceptor<Protocol, SocketAcceptorService> > acceptor,
+template <typename Protocol>
+static void RPCAcceptHandler(boost::shared_ptr< basic_socket_acceptor<Protocol> > acceptor,
     ssl::context& context,
     const bool fUseSSL,
-    boost::shared_ptr<AcceptedConnection> conn,
+    boost::shared_ptr< AcceptedConnection > conn,
     const boost::system::error_code& error)
 {
     // Immediately start accepting new connections, except when we're cancelled or our socket is closed.
@@ -593,7 +596,7 @@ void StartRPCThreads()
 
     assert(rpc_io_service == NULL);
     rpc_io_service = new asio::io_service();
-    rpc_ssl_context = new ssl::context(*rpc_io_service, ssl::context::sslv23);
+    rpc_ssl_context = new ssl::context(ssl::context::sslv23);
 
     const bool fUseSSL = GetBoolArg("-rpcssl", false);
 
@@ -615,7 +618,7 @@ void StartRPCThreads()
             LogPrintf("ThreadRPCServer ERROR: missing server private key file %s\n", pathPKFile.string());
 
         string strCiphers = GetArg("-rpcsslciphers", "TLSv1.2+HIGH:TLSv1+HIGH:!SSLv2:!aNULL:!eNULL:!3DES:@STRENGTH");
-        SSL_CTX_set_cipher_list(rpc_ssl_context->impl(), strCiphers.c_str());
+        SSL_CTX_set_cipher_list(rpc_ssl_context->native_handle(), strCiphers.c_str());
     }
 
     std::vector<ip::tcp::endpoint> vEndpoints;
@@ -1030,7 +1033,7 @@ std::string HelpExampleRpc(string methodname, string args)
 {
     return "> curl --user myusername --data-binary '{\"jsonrpc\": \"1.0\", \"id\":\"curltest\", "
            "\"method\": \"" +
-           methodname + "\", \"params\": [" + args + "] }' -H 'content-type: text/plain;' http://127.0.0.1:51473/\n";
+           methodname + "\", \"params\": [" + args + "] }' -H 'content-type: text/plain;' http://127.0.0.1:17770/\n";
 }
 
 const CRPCTable tableRPC;

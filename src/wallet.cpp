@@ -1,7 +1,8 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2014 The Bitcoin developers
 // Copyright (c) 2014-2015 The Dash developers
-// Copyright (c) 2015-2017 The DMD developers
+// Copyright (c) 2015-2017 The PIVX developers 
+// Copyright (c) 2015-2017 The DMD Diamond developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 ////
@@ -207,6 +208,36 @@ bool CWallet::RemoveWatchOnly(const CScript& dest)
 bool CWallet::LoadWatchOnly(const CScript& dest)
 {
     return CCryptoKeyStore::AddWatchOnly(dest);
+}
+
+bool CWallet::AddMultiSig(const CScript& dest)
+{
+    if (!CCryptoKeyStore::AddMultiSig(dest))
+        return false;
+    nTimeFirstKey = 1; // No birthday information
+    NotifyMultiSigChanged(true);
+    if (!fFileBacked)
+        return true;
+    return CWalletDB(strWalletFile).WriteMultiSig(dest);
+}
+
+bool CWallet::RemoveMultiSig(const CScript& dest)
+{
+    AssertLockHeld(cs_wallet);
+    if (!CCryptoKeyStore::RemoveMultiSig(dest))
+        return false;
+    if (!HaveMultiSig())
+        NotifyMultiSigChanged(false);
+    if (fFileBacked)
+        if (!CWalletDB(strWalletFile).EraseMultiSig(dest))
+            return false;
+
+    return true;
+}
+
+bool CWallet::LoadMultiSig(const CScript& dest)
+{
+    return CCryptoKeyStore::AddMultiSig(dest);
 }
 
 bool CWallet::Unlock(const SecureString& strWalletPassphrase, bool anonymizeOnly)
@@ -1470,13 +1501,26 @@ void CWallet::AvailableCoins(vector<COutput>& vCoins, bool fOnlyConfirmed, const
                 if (!found) continue;
 
                 isminetype mine = IsMine(pcoin->vout[i]);
-                if (!(IsSpent(wtxid, i)) && mine != ISMINE_NO &&
-                    (!IsLockedCoin((*it).first, i) || nCoinType == ONLY_10000) &&
-                    (pcoin->vout[i].nValue > 0 || fIncludeZeroValue) &&
-                    (!coinControl || !coinControl->HasSelected() || coinControl->fAllowOtherInputs || coinControl->IsSelected((*it).first, i)))
-                    vCoins.push_back(COutput(pcoin, i, nDepth,
-                        ((mine & ISMINE_SPENDABLE) != ISMINE_NO) ||
-                            (coinControl && coinControl->fAllowWatchOnly && (mine & ISMINE_WATCH_SOLVABLE) != ISMINE_NO)));
+                if (IsSpent(wtxid, i))
+                    continue;
+                if (mine == ISMINE_NO)
+                    continue;
+                if (mine == ISMINE_WATCH_ONLY)
+                    continue;
+
+                if (IsLockedCoin((*it).first, i) && nCoinType != ONLY_10000)
+                    continue;
+                if (pcoin->vout[i].nValue <= 0 && !fIncludeZeroValue)
+                    continue;
+                if (coinControl && coinControl->HasSelected() && !coinControl->fAllowOtherInputs && !coinControl->IsSelected((*it).first, i))
+                    continue;
+
+                bool fIsSpendable = false;
+                if ((mine & ISMINE_SPENDABLE) != ISMINE_NO)
+                    fIsSpendable = true;
+                if ((mine & ISMINE_MULTISIG) != ISMINE_NO)
+                    fIsSpendable = true;
+                vCoins.emplace_back(COutput(pcoin, i, nDepth, fIsSpendable));
             }
         }
     }
@@ -2212,6 +2256,12 @@ bool CWallet::CreateTransaction(const vector<pair<CScript, CAmount> >& vecSend,
                     // TODO: pass in scriptChange instead of reservekey so
                     // change transaction isn't always pay-to-diamond-address
                     CScript scriptChange;
+					
+					if (CBitcoinAddress(changeAddress).IsValid())
+                    //scriptChange.SetDestination(changeAddress);
+				    scriptChange = GetScriptForDestination(changeAddress);
+                    else
+                    {
 
                     // coin control: send change to custom address
                     if (coinControl && !boost::get<CNoDestination>(&coinControl->destChange))
@@ -2234,6 +2284,7 @@ bool CWallet::CreateTransaction(const vector<pair<CScript, CAmount> >& vecSend,
 
                         scriptChange = GetScriptForDestination(vchPubKey.GetID());
                     }
+					}
 
                     CTxOut newTxOut(nChange, scriptChange);
 
@@ -2315,7 +2366,7 @@ bool CWallet::CreateTransaction(CScript scriptPubKey, const CAmount& nValue, CWa
     return CreateTransaction(vecSend, wtxNew, reservekey, nFeeRet, strFailReason, coinControl, coin_type, useIX, nFeePay);
 }
 // Change it to true or false for debug dustfunction
-bool dustdebug = true;
+bool dustdebug = false;
 // ppcoin: create coin stake transaction
 bool CWallet::CreateCoinStake(const CKeyStore& keystore, unsigned int nBits, int64_t nSearchInterval, CMutableTransaction& txNew, unsigned int& nTxNewTime)
     {
