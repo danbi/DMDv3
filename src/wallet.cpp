@@ -3487,7 +3487,7 @@ void CWallet::AutoCombineDust()
             if (out.tx->IsCoinStake() && out.tx->GetDepthInMainChain() < Params().COINBASE_MATURITY() + 1 )
                 continue;
 
-            if (nTotalRewardsValue + out.Value() > nAutoCombineThreshold * COIN)
+            if (out.Value() > nAutoCombineThreshold * COIN)
                 continue;
 
             COutPoint outpt(out.tx->GetHash(), out.i);
